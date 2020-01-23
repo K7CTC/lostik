@@ -22,7 +22,7 @@ import sys
 import pathlib
 
 #establish and parse command line arguments
-parser = argparse.ArgumentParser(description='Ronoth LoStik Utility: Get Configuration',epilog='Created by K7CTC.  This utility will output relevant LoRa settings from the LoStik device.')
+parser = argparse.ArgumentParser(description='Ronoth LoStik Utility: Set Configuration',epilog='Created by K7CTC.  This utility will write relevant LoRa settings to the LoStik device.')
 parser.add_argument('-p', '--port', help='LoStik serial port descriptor (default: /dev/ttyUSB0)', default='/dev/ttyUSB0')
 args = parser.parse_args()
 

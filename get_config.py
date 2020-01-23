@@ -115,9 +115,9 @@ time.sleep(.5)
 
 #turn off both LEDS
 lostik.write(b'sys set pindig GPIO10 0\r\n')
-null = lostik.readline().decode('ASCII')
+from_lostik = lostik.readline().decode('ASCII')
 lostik.write(b'sys set pindig GPIO11 0\r\n')
-null = lostik.readline().decode('ASCII')
+from_lostik = lostik.readline().decode('ASCII')
 
 #disconnect from lostik
 print('Disconnecting from LoStik...\r', end='')

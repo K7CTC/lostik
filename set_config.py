@@ -12,7 +12,6 @@
 #                 the device.  The device will generally respond with 'ok'   #
 #                 when a parameter is successully written.                   #
 #                                                                            #
-#                                                                            #
 ##############################################################################
 
 #import required modules

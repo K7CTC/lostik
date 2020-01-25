@@ -172,8 +172,7 @@ while True:
             incremental_print('.')
         else:
             if rx_data == 'radio_err':
-                print()
-                break
+                print('\n' + 'Radio Watchdog Timer Timeout' + '\n')
             rx_data_array = rx_data.split()
             if rx_data_array[0] == 'radio_rx':
                 print('\n' + ' MSG: ' + bytes.fromhex(rx_data_array[1]).decode('ASCII'))

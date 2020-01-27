@@ -3,7 +3,7 @@
 ##############################################################################
 #                                                                            #
 #  DEVELOPED BY:  Chris Clement (K7CTC)                                      #
-#       VERSION:  v1.0                                                       #
+#       VERSION:  v1.1                                                       #
 #   DESCRIPTION:  This utility was written for use with the Ronoth LoStik    #
 #                 LoRa transceiver.  It is intended to be run on Linux but   #
 #                 can be adapted for Windows with some modification.  The    #
@@ -13,6 +13,9 @@
 #                 described within the Microchip RN2903 command reference    #
 #                 document.                                                  #
 #                                                                            #
+#   INFORMATION:  Ronoth LoStik does not retain radio settings between       #
+#                 power cycles.                                              #
+#                                                                            #
 ##############################################################################
 
 #import required modules
@@ -21,43 +24,68 @@ import serial
 import time
 import sys
 import pathlib
+import os
+
+#start with a clear terminal window
+os.system('clear')
 
 #establish and parse command line arguments
-parser = argparse.ArgumentParser(description='Ronoth LoStik Utility: Get Configuration',epilog='Created by K7CTC.  This utility will output relevant LoRa settings from the LoStik device.')
+parser = argparse.ArgumentParser(description='Ronoth LoStik Utility: Get Configuration', epilog='Created by K7CTC.  This utility will output relevant LoRa settings from the LoStik device.')
 parser.add_argument('-p', '--port', help='LoStik serial port descriptor (default: /dev/ttyUSB0)', default='/dev/ttyUSB0')
 args = parser.parse_args()
 
-#check to see if the port descriptor path exists (determines if device is connected)
+##### BEGIN LOSTIK STARTUP #####
+
+#check to see if the port descriptor path exists (determines if device is connected on linux systems)
 lostik_path = pathlib.Path(args.port)
 try:
+    print('Looking for LoStik...\r', end='')
     lostik_abs_path = lostik_path.resolve(strict=True)
 except FileNotFoundError:
-    print('LoStik serial port descriptor not found!')
-    print('Check serial port descriptor and/or device connection.')
+    print('Looking for LoStik... FAIL!')
+    print('ERROR: LoStik serial port descriptor not found!')
+    print('HELP: Check serial port descriptor and/or device connection.')
     print('Unable to proceed, now exiting!')
     sys.exit(1)
+else:
+    print('Looking for LoStik... DONE!')
 
 #connect to lostik
 try:
     print('Connecting to LoStik...\r', end='')
     lostik = serial.Serial(args.port, baudrate=57600, timeout=1)
 except:
-    print('Connecting to LoStik... FAIL!  Check port permissions.')
+    print('Connecting to LoStik... FAIL!')
+    print('HELP: Check port permissions. Current user must be in "dialout" group.')
     print('Unable to proceed, now exiting!')
     sys.exit(1)
+#at this point we're already connected, but we can call the is_open method just to be sure
 else:
     if lostik.is_open == True:
         print('Connecting to LoStik... DONE!')
     elif lostik.is_open == False:
-        print('Connecting to LoStik... FAIL!  Check port permissions.')
+        print('Connecting to LoStik... FAIL!')
+        print('HELP: Check port permissions. Current user must be in "dialout" group.')
         print('Unable to proceed, now exiting!')
         sys.exit(1)
 
-#turn on both LEDs
-lostik.write(b'sys set pindig GPIO10 1\r\n')
-from_lostik = lostik.readline().decode('ASCII')
-lostik.write(b'sys set pindig GPIO11 1\r\n')
-from_lostik = lostik.readline().decode('ASCII')
+#make sure both LEDs are off before continuing
+rx_led_off = False
+tx_led_off = False
+print('Checking status LEDs...\r', end='')
+lostik.write(b'sys set pindig GPIO10 0\r\n') #GPIO10 is the blue rx led
+if lostik.readline().decode('ASCII').rstrip() == 'ok':
+    rx_led_off = True
+lostik.write(b'sys set pindig GPIO11 0\r\n') #GPIO11 is the red tx led
+if lostik.readline().decode('ASCII').rstrip() == 'ok':
+    tx_led_off = True
+if rx_led_off == True and tx_led_off == True:
+    print('Checking status LEDs... DONE!')
+else:
+    print('Checking status LEDs...FAIL!')
+    print('ERROR: Error communicating with LoStik.')
+    print('Unable to proceed, now exiting!')
+    sys.exit(1)
 
 #pause mac (LoRaWAN) as this is required to access the radio directly
 print('Pausing LoRaWAN protocol stack...\r', end='')
@@ -65,7 +93,51 @@ lostik.write(b'mac pause\r\n')
 if lostik.readline().decode('ASCII') == '4294967245\r\n':
     print('Pausing LoRaWAN protocol stack... DONE!\n')
 else:
-    print('Pausing LoRaWAN protocol stack...FAIL!\n')
+    print('Pausing LoRaWAN protocol stack...FAIL!')
+    print('ERROR: Error communicating with LoStik.')
+    print('Unable to proceed, now exiting!')
+    sys.exit(1)
+
+##### END LOSTIK STARTUP #####
+
+##### BEGIN LOSTIK FUNCTIONS #####
+
+#function for controlling LEDS
+def led_control(led, state):
+    if led == 'rx':
+        if state == 'off':
+            lostik.write(b'sys set pindig GPIO10 0\r\n') #GPIO10 is the blue rx led
+            if lostik.readline().decode('ASCII') == 'ok':
+                return True
+            else:
+                return False
+        elif state == 'on':
+            lostik.write(b'sys set pindig GPIO10 1\r\n') #GPIO10 is the blue rx led
+            if lostik.readline().decode('ASCII') == 'ok':
+                return True
+            else:
+                return False
+    elif led == 'tx':
+        if state == 'off':
+            lostik.write(b'sys set pindig GPIO11 0\r\n') #GPIO11 is the red tx led
+            if lostik.readline().decode('ASCII') == 'ok':
+                return True
+            else:
+                return False
+        elif state == 'on':
+            lostik.write(b'sys set pindig GPIO11 1\r\n') #GPIO11 is the red tx led
+            if lostik.readline().decode('ASCII') == 'ok':
+                return True
+            else:
+                return False
+    else:
+        return False
+
+##### END LOSTIK FUNCTIONS #####
+
+#turn on both LEDs
+led_control('rx', 'on')
+led_control('tx', 'on')
 
 #get a bunch of stuff from the radio
 print('Current LoStik Configuration')
@@ -113,11 +185,9 @@ print('Last Received Frame RSSI (default=-128): ' + lostik.readline().decode('AS
 #sleep for half second
 time.sleep(.5)
 
-#turn off both LEDS
-lostik.write(b'sys set pindig GPIO10 0\r\n')
-from_lostik = lostik.readline().decode('ASCII')
-lostik.write(b'sys set pindig GPIO11 0\r\n')
-from_lostik = lostik.readline().decode('ASCII')
+#turn of both LEDs
+led_control('rx', 'off')
+led_control('tx', 'off')
 
 #disconnect from lostik
 print('Disconnecting from LoStik...\r', end='')
@@ -126,3 +196,6 @@ if lostik.is_open == True:
     print('Disconnecting from LoStik... FAIL!')
 elif lostik.is_open == False:
     print('Disconnecting from LoStik... DONE!')
+
+#user notice
+print('NOTE: Settings do not persist after device power cycle.')

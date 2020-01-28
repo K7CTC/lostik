@@ -3,7 +3,7 @@
 ##############################################################################
 #                                                                            #
 #  DEVELOPED BY:  Chris Clement (K7CTC)                                      #
-#       VERSION:  v1.1                                                       #
+#       VERSION:  v1.2                                                       #
 #   DESCRIPTION:  This utility was written for use with the Ronoth LoStik    #
 #                 LoRa transceiver.  It is intended to be run on Linux but   #
 #                 can be adapted for Windows with some modification.  The    #
@@ -90,7 +90,7 @@ else:
 #pause mac (LoRaWAN) as this is required to access the radio directly
 print('Pausing LoRaWAN protocol stack...\r', end='')
 lostik.write(b'mac pause\r\n')
-if lostik.readline().decode('ASCII') == '4294967245\r\n':
+if lostik.readline().decode('ASCII').rstrip() == '4294967245':
     print('Pausing LoRaWAN protocol stack... DONE!\n')
 else:
     print('Pausing LoRaWAN protocol stack...FAIL!')
@@ -107,26 +107,26 @@ def led_control(led, state):
     if led == 'rx':
         if state == 'off':
             lostik.write(b'sys set pindig GPIO10 0\r\n') #GPIO10 is the blue rx led
-            if lostik.readline().decode('ASCII') == 'ok':
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
                 return True
             else:
                 return False
         elif state == 'on':
             lostik.write(b'sys set pindig GPIO10 1\r\n') #GPIO10 is the blue rx led
-            if lostik.readline().decode('ASCII') == 'ok':
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
                 return True
             else:
                 return False
     elif led == 'tx':
         if state == 'off':
             lostik.write(b'sys set pindig GPIO11 0\r\n') #GPIO11 is the red tx led
-            if lostik.readline().decode('ASCII') == 'ok':
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
                 return True
             else:
                 return False
         elif state == 'on':
             lostik.write(b'sys set pindig GPIO11 1\r\n') #GPIO11 is the red tx led
-            if lostik.readline().decode('ASCII') == 'ok':
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
                 return True
             else:
                 return False

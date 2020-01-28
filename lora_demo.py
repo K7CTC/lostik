@@ -3,7 +3,7 @@
 ##############################################################################
 #                                                                            #
 #  DEVELOPED BY:  Chris Clement (K7CTC)                                      #
-#       VERSION:  v1.0                                                       #
+#       VERSION:  v1.2                                                       #
 #   DESCRIPTION:  This utility was written for use with the Ronoth LoStik    #
 #                 LoRa transceiver.  It is intended to be run on Linux but   #
 #                 can be adapted for Windows with some modification.  The    #
@@ -27,23 +27,121 @@ import sys
 import pathlib
 import os
 
+#start with a clear terminal window
+os.system('clear')
+
 #establish and parse command line arguments
 parser = argparse.ArgumentParser(description='Ronoth LoStik Utility: TX Demonstration',epilog='Created by K7CTC.  This utility will transmit a static message with various modulation settings.')
 parser.add_argument('-p', '--port', help='LoStik serial port descriptor (default: /dev/ttyUSB0)', default='/dev/ttyUSB0')
 args = parser.parse_args()
 
-#check to see if the port descriptor path exists (determines if device is connected)
+##### BEGIN LOSTIK STARTUP #####
+
+#check to see if the port descriptor path exists (determines if device is connected on linux systems)
 lostik_path = pathlib.Path(args.port)
 try:
+    print('Looking for LoStik...\r', end='')
     lostik_abs_path = lostik_path.resolve(strict=True)
 except FileNotFoundError:
-    print('LoStik serial port descriptor not found!')
-    print('Check serial port descriptor and/or device connection.')
+    print('Looking for LoStik... FAIL!')
+    print('ERROR: LoStik serial port descriptor not found!')
+    print('HELP: Check serial port descriptor and/or device connection.')
+    print('Unable to proceed, now exiting!')
+    sys.exit(1)
+else:
+    print('Looking for LoStik... DONE!')
+
+#connect to lostik
+try:
+    print('Connecting to LoStik...\r', end='')
+    lostik = serial.Serial(args.port, baudrate=57600, timeout=1)
+except:
+    print('Connecting to LoStik... FAIL!')
+    print('HELP: Check port permissions. Current user must be in "dialout" group.')
+    print('Unable to proceed, now exiting!')
+    sys.exit(1)
+#at this point we're already connected, but we can call the is_open method just to be sure
+else:
+    if lostik.is_open == True:
+        print('Connecting to LoStik... DONE!')
+    elif lostik.is_open == False:
+        print('Connecting to LoStik... FAIL!')
+        print('HELP: Check port permissions. Current user must be in "dialout" group.')
+        print('Unable to proceed, now exiting!')
+        sys.exit(1)
+
+#make sure both LEDs are off before continuing
+rx_led_off = False
+tx_led_off = False
+print('Checking status LEDs...\r', end='')
+lostik.write(b'sys set pindig GPIO10 0\r\n') #GPIO10 is the blue rx led
+if lostik.readline().decode('ASCII').rstrip() == 'ok':
+    rx_led_off = True
+lostik.write(b'sys set pindig GPIO11 0\r\n') #GPIO11 is the red tx led
+if lostik.readline().decode('ASCII').rstrip() == 'ok':
+    tx_led_off = True
+if rx_led_off == True and tx_led_off == True:
+    print('Checking status LEDs... DONE!')
+else:
+    print('Checking status LEDs...FAIL!')
+    print('ERROR: Error communicating with LoStik.')
     print('Unable to proceed, now exiting!')
     sys.exit(1)
 
+#pause mac (LoRaWAN) as this is required to access the radio directly
+print('Pausing LoRaWAN protocol stack...\r', end='')
+lostik.write(b'mac pause\r\n')
+if lostik.readline().decode('ASCII').rstrip() == '4294967245':
+    print('Pausing LoRaWAN protocol stack... DONE!\n')
+else:
+    print('Pausing LoRaWAN protocol stack...FAIL!')
+    print('ERROR: Error communicating with LoStik.')
+    print('Unable to proceed, now exiting!')
+    sys.exit(1)
+
+##### END LOSTIK STARTUP #####
+
+##### BEGIN LOSTIK FUNCTIONS #####
+
+#function for controlling LEDS
+def led_control(led, state):
+    if led == 'rx':
+        if state == 'off':
+            lostik.write(b'sys set pindig GPIO10 0\r\n') #GPIO10 is the blue rx led
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
+                return True
+            else:
+                return False
+        elif state == 'on':
+            lostik.write(b'sys set pindig GPIO10 1\r\n') #GPIO10 is the blue rx led
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
+                return True
+            else:
+                return False
+    elif led == 'tx':
+        if state == 'off':
+            lostik.write(b'sys set pindig GPIO11 0\r\n') #GPIO11 is the red tx led
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
+                return True
+            else:
+                return False
+        elif state == 'on':
+            lostik.write(b'sys set pindig GPIO11 1\r\n') #GPIO11 is the red tx led
+            if lostik.readline().decode('ASCII').rstrip() == 'ok':
+                return True
+            else:
+                return False
+    else:
+        return False
+
+##### END LOSTIK FUNCTIONS #####
+
+#we need a function that can bypass the print() buffer so the console can be updated in real-time
+def incremental_print(text):
+    sys.stdout.write(str(text))
+    sys.stdout.flush()
+
 #let's give a brief introduction
-os.system('clear')
 print('Purpose')
 print('-------')
 print('This utility connects to the LoStik via its serial interfact and instructs')
@@ -56,31 +154,6 @@ print('etc.).  This test is best accompanied with an SDR so that the received')
 print('signals can be properly viewed and analized.\n')
 input('Press Enter to continue...')
 print()
-
-#connect to lostik
-os.system('clear')
-try:
-    print('Connecting to LoStik...\r', end='')
-    lostik = serial.Serial(args.port, baudrate=57600, timeout=5)
-except:
-    print('Connecting to LoStik... FAIL!  Check port permissions.')
-    print('Unable to proceed, now exiting!')
-    sys.exit(1)
-else:
-    if lostik.is_open == True:
-        print('Connecting to LoStik... DONE!')
-    elif lostik.is_open == False:
-        print('Connecting to LoStik... FAIL!  Check port permissions.')
-        print('Unable to proceed, now exiting!')
-        sys.exit(1)
-
-#pause mac (LoRaWAN) as this is required to access the radio directly
-print('Pausing LoRaWAN protocol stack...\r', end='')
-lostik.write(b'mac pause\r\n')
-if lostik.readline().decode('ASCII') == '4294967245\r\n':
-    print('Pausing LoRaWAN protocol stack... DONE!\n')
-else:
-    print('Pausing LoRaWAN protocol stack...FAIL!\n')
 
 #static settings to be written to LoStik (until device power cycle)
 #Modulation Mode (default=lora)
@@ -103,6 +176,9 @@ end_line = b'\r\n'
 #write settings to LoStik
 print('Initializing LoStik for Demo')
 print('----------------------------')
+#place LEDs in a "config" state
+led_control('rx', 'on')
+led_control('tx', 'on')
 #set mode (default: lora)
 lostik.write(b''.join([b'radio set mod ', set_mod, end_line]))
 print('Set Modulation Mode = ' + set_mod.decode('ASCII') + ': ' + lostik.readline().decode('ASCII'), end='')
@@ -124,6 +200,10 @@ print('Set Watchdog Timer Timeout = ' + set_wdt.decode('ASCII') + ': ' + lostik.
 #set sync word (default: 34)
 lostik.write(b''.join([b'radio set sync ', set_sync, end_line]))
 print('Set Sync Word = ' + set_sync.decode('ASCII') + ': ' + lostik.readline().decode('ASCII'))
+#place LEDs back into a neutral state
+time.sleep(.5)
+led_control('rx', 'off')
+led_control('tx', 'off')
 input('Press Enter to continue...')
 
 #let's establish the test messages that will be sent OTA
@@ -135,7 +215,7 @@ message_long = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut augu
 message_long_hex = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut augue augue, volutpat quis nisi vitae, venenatis vestibulum justo. Phasellus neque nisi, eleifend sed enim eu, imperdiet faucibus orci. Nam ut lectus velit. Aliquam vel orci a massa semper metus.'.hex()
 
 #function for running test transmissions
-def run_test(sf_value, cr_value, bw_value):
+def run_test(sf_value, cr_value, bw_value, msg_len):
     #settings to be written to LoStik
     #Spreading Factor (default=sf12)
     set_sf = sf_value                       #values: sf7, sf8, sf9, sf10, sf11, sf12
@@ -148,6 +228,9 @@ def run_test(sf_value, cr_value, bw_value):
     os.system('clear')
     print('Writing LoStik Settings')
     print('-----------------------')
+    #place LEDs in a "config" state
+    led_control('rx', 'on')
+    led_control('tx', 'on')
     #set spreading factor (default: sf12)
     lostik.write(b''.join([b'radio set sf ', set_sf, end_line]))
     print('Set Spreading Factor = ' + set_sf.decode('ASCII') + ': ' + lostik.readline().decode('ASCII'), end='')
@@ -157,67 +240,62 @@ def run_test(sf_value, cr_value, bw_value):
     #set radio bandwidth (default: 125)
     lostik.write(b''.join([b'radio set bw ', set_bw, end_line]))
     print('  Set Radio Bandwidth = ' + set_bw.decode('ASCII') + ': ' + lostik.readline().decode('ASCII'))
+    #place LEDs back into a neutral state
+    time.sleep(.5)
+    led_control('rx', 'off')
+    led_control('tx', 'off')
 
     #pause before transmitting
-    input('Press Enter to TX short message...')
+    input('Press Enter to transmit message...')
     print()
 
-    #perform test transmission(s)
-    print('Transmitting Short Message (63 bytes)')
-    print('-------------------------------------')
-
-    #turn on 'transmit' LED
-    lostik.write(b'sys set pindig GPIO11 1\r\n')
-    from_lostik = lostik.readline().decode('ASCII')
-
-    #transmit message here
-    print('PLAIN TEXT: ' + message_short + '\n')
-    assemble_command = 'radio tx ' + str(message_short_hex) + '\r\n'
-    command = assemble_command.encode('ASCII')
-    print('  RAW DATA: ' + command.decode('ASCII'))
-    lostik.write(command)
-    print('TX COMMAND: ' + lostik.readline().decode('ASCII'), end='')
-    time.sleep(5)
-    print(' TX RESULT: ' + lostik.readline().decode('ASCII'))
-  
-    #turn off 'transmit' LED
-    lostik.write(b'sys set pindig GPIO11 0\r\n')
-    from_lostik = lostik.readline().decode('ASCII')
-
-    #pause before transmitting
-    input('Press Enter to TX long message...')
-    print()
-
-    #perform test transmission(s)
-    print('Transmitting Long Message (255 bytes)')
-    print('-------------------------------------')
-
-    #turn on 'transmit' LED
-    lostik.write(b'sys set pindig GPIO11 1\r\n')
-    from_lostik = lostik.readline().decode('ASCII')
-
-    #transmit message here
-    print('PLAIN TEXT: ' + message_long + '\n')
-    assemble_command = 'radio tx ' + str(message_long_hex) + '\r\n'
-    command = assemble_command.encode('ASCII')
-    print('  RAW DATA: ' + command.decode('ASCII'))
-    lostik.write(command)
-    print('TX COMMAND: ' + lostik.readline().decode('ASCII'), end='')
-    time.sleep(15)
-    print(' TX RESULT: ' + lostik.readline().decode('ASCII'))
-  
-    #turn off 'transmit' LED
-    lostik.write(b'sys set pindig GPIO11 0\r\n')
-    from_lostik = lostik.readline().decode('ASCII')
-
+    #transmit message
+    print('Transmitting Message')
+    print('--------------------')
+    tx_start_time = 0
+    tx_end_time = 0
+    if msg_len == 'short':
+        print('PLAIN TEXT: ' + message_short)
+        assemble_command = 'radio tx ' + str(message_short_hex) + '\r\n'
+        command = assemble_command.encode('ASCII')
+        print('  RAW DATA: ' + command.decode('ASCII').rstrip() + '\n')
+        lostik.write(command)
+        if lostik.readline().decode('ASCII').rstrip() == 'ok':
+            tx_start_time = int(round(time.time()*1000)) #get current unix epoch time in milliseconds
+            led_control('tx', 'on')
+            incremental_print('Transmitting')
+        else:
+            print('ERROR: Error communicating with LoStik.')
+            print('Unable to proceed, now exiting!')
+            sys.exit(1)
+    response = ''
+    while response == '':
+        response = lostik.readline().decode('ASCII').rstrip()
+        incremental_print('.')
+    else:
+        if response == 'radio_tx_ok':
+            tx_end_time = int(round(time.time()*1000))
+            led_control('tx', 'off')
+            time_on_air = tx_end_time - tx_start_time
+            incremental_print('DONE!  Total time on air: ' + str(time_on_air) + 'ms\n\n')
+        elif response == 'radio_err':
+            led_control('tx', 'off')
+            incremental_print('FAIL!\n')
+    
     #pause for next test
     input('Press Enter to continue...')
 
 #iterate through tests
-run_test(b'sf12', b'4/5', b'125')
-#run_test(b'sf7', b'4/5', b'125')
-run_test(b'sf12', b'4/8', b'125')
-#run_test(b'sf12', b'4/5', b'500')
+run_test(b'sf12', b'4/5', b'125', 'short')
+#run_test(b'sf7', b'4/5', b'125', 'short')
+run_test(b'sf12', b'4/8', b'125', 'short')
+run_test(b'sf12', b'4/5', b'500', 'short')
+run_test(b'sf12', b'4/8', b'500', 'short')
+
+#run_test(b'sf12', b'4/5', b'125', 'long')
+#run_test(b'sf7', b'4/5', b'125', 'long')
+#run_test(b'sf12', b'4/8', b'125', 'long')
+#run_test(b'sf12', b'4/5', b'500', 'long')
 
 #disconnect from lostik
 print('Disconnecting from LoStik...\r', end='')

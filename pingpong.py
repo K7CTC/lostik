@@ -3,7 +3,7 @@
 ##############################################################################
 #                                                                            #
 #  DEVELOPED BY:  Chris Clement (K7CTC)                                      #
-#       VERSION:  v0.1 (alpha)                                               #
+#       VERSION:  v0.9 (beta)                                                #
 #   DESCRIPTION:  This utility was written for use with the Ronoth LoStik    #
 #                 LoRa transceiver.  The utility connects to the LoStik      #
 #                 via its serial interface and listens for incoming packets. #
@@ -359,12 +359,14 @@ while True:
                     snr = lostik_get_snr()
                     if args.pong:
                         if bytes.fromhex(rx_data_array[1]).decode('ASCII') == 'Ping!':
-                            print('Ping! Pong!')
+                            print('\n')
+                            print('Ping! Pong! (Heard a ping, now sending a pong!)')
                             pong(rssi, snr)
                     else:
-                        print('\n' + '    MSG: ' + bytes.fromhex(rx_data_array[1]).decode('ASCII'))
+                        print('\n')
+                        print('    MSG: ' + bytes.fromhex(rx_data_array[1]).decode('ASCII'))
                         print('   RSSI: ' + rssi + 'dBm')
-                        print('    SNR: ' + snr + 'dB')
+                        print('    SNR: ' + snr + 'dB\n')
     else:
         lostik_rx_control('off')
 

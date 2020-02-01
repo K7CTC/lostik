@@ -226,11 +226,21 @@ except:
 #at this point we're already connected, but we can call the is_open method just to be sure
 else:
     if lostik.is_open == True:
-        print('Connecting to LoStik... CONNECTED!')
+        #while we're at it...
+        #make sure it's actually a LoStik we are talking to and not something else (like a GPS)
+        lostik.write(b'sys get ver\r\n')
+        if lostik.readline().decode('ASCII').rstrip() == 'RN2903 1.0.5 Nov 06 2018 10:45:27':
+            print('Connecting to LoStik... CONNECTED!')
+        else:
+            print('Connecting to LoStik... FAILURE!')
+            print('HELP: Port descriptor is in use by another device.')
+            sys.exit(1)
     elif lostik.is_open == False:
         print('Connecting to LoStik... FAILURE!')
         print('HELP: Check port permissions. Current user must be member of "dialout" group.')
         sys.exit(1)
+
+
 
 #make sure both LEDs are off before continuing
 rx_led_initialized = False
